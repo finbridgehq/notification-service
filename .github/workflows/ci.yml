@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint, tests y build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm exec eslint "src/**/*.ts"
+
+      - name: Unit tests (cobertura mínima 80%)
+        run: pnpm test:cov
+
+      - name: Build
+        run: pnpm build
+
+      - name: Docker build
+        run: docker build -t vankoo-notification-service:ci .
+
+  # Despliegue a Azure Container Apps (fuera de alcance por ahora). Para activarlo:
+  # 1. Crear el Container App en vankoo-infra/terraform/apps (ver README, "Despliegue").
+  # 2. Dar a este repo las credenciales OIDC de vankoo-github-ci.
+  # 3. Descomentar este job.
+  #
+  # deliver:
+  #   needs: build
+  #   if: github.ref == 'refs/heads/develop'
+  #   uses: liquilabshq/vankoo-infra/.github/workflows/deliver-container-app.yml@develop
+  #   with:
+  #     image: notification-service
+  #     container-app: vankoo-notification-service
+  #   secrets: inherit
